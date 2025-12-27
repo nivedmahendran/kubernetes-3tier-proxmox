@@ -73,7 +73,7 @@ resource "proxmox_virtual_environment_vm" "k8s_control" {
     }
 
     user_account {
-      username = "reon"
+      username = "your-username-here"
       password = "your-password-here"
       keys     = var.ssh_public_key != "" ? [var.ssh_public_key] : []
     }
@@ -149,7 +149,7 @@ resource "proxmox_virtual_environment_vm" "k8s_nodes" {
     }
 
     user_account {
-      username = "reon"
+      username = "your-username-here"
       password = "your-password-here"
       keys     = var.ssh_public_key != "" ? [var.ssh_public_key] : []
     }

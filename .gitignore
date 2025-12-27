@@ -33,3 +33,8 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# Sensitive data
+terraform.tfvars
+*credentials*
+*secrets*
