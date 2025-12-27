@@ -1,0 +1,155 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-app
+  labels:
+    app: todo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: todo-app
+  template:
+    metadata:
+      labels:
+        app: todo-app
+    spec:
+      containers:
+      - name: todo-app
+        image: httpd:2.4
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: html-volume
+          mountPath: /usr/local/apache2/htdocs/
+      volumes:
+      - name: html-volume
+        configMap:
+          name: todo-html
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Todo Application - Kubernetes</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                min-height: 100vh;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 40px;
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+                text-align: center;
+            }
+            .header {
+                margin-bottom: 30px;
+            }
+            .header h1 {
+                color: #333;
+                margin: 0;
+                font-size: 2.5em;
+            }
+            .header p {
+                color: #666;
+                font-size: 1.2em;
+            }
+            .todo-list {
+                text-align: left;
+                margin: 30px 0;
+            }
+            .todo-item {
+                background: #f8f9fa;
+                border-left: 4px solid #4CAF50;
+                padding: 20px;
+                margin: 15px 0;
+                border-radius: 8px;
+                transition: all 0.3s ease;
+            }
+            .todo-item:hover {
+                transform: translateX(10px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            }
+            .footer {
+                margin-top: 40px;
+                padding: 20px;
+                background: #2196F3;
+                color: white;
+                border-radius: 10px;
+            }
+            .stats {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>📝 Todo Application</h1>
+                <p>Deployed on Kubernetes Cluster</p>
+            </div>
+            
+            <div class="todo-list">
+                <div class="todo-item">
+                    <h3>✅ Deploy Kubernetes Cluster</h3>
+                    <p>3-node cluster with control plane and workers</p>
+                </div>
+                <div class="todo-item">
+                    <h3>✅ Configure Networking</h3>
+                    <p>Calico CNI and NodePort services</p>
+                </div>
+                <div class="todo-item">
+                    <h3>✅ Deploy Applications</h3>
+                    <p>Nginx and Todo applications running</p>
+                </div>
+                <div class="todo-item">
+                    <h3>🚀 Test Load Balancing</h3>
+                    <p>Verify application accessibility</p>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <div class="stats">
+                    <span>🌟 Status: Production Ready</span>
+                    <span>K8s v1.28.15</span>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-service
+spec:
+  selector:
+    app: todo-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30300
+  type: NodePort

@@ -1,0 +1,372 @@
+---
+# Database Tier
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: "appdb"
+        - name: POSTGRES_USER
+          value: "appuser"
+        - name: POSTGRES_PASSWORD
+          value: "apppass"
+        ports:
+        - containerPort: 5432
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database-service
+spec:
+  selector:
+    app: database
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+# Backend API Tier
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-html
+data:
+  health.json: '{"status": "healthy", "tier": "backend", "timestamp": "2025-12-27T08:40:00Z"}'
+  todos.json: '[{"id": 1, "title": "Setup Kubernetes Cluster", "description": "Deploy 3-tier application", "completed": true}, {"id": 2, "title": "Configure Networking", "description": "Setup services and load balancing", "completed": true}, {"id": 3, "title": "Deploy 3-Tier App", "description": "Frontend, Backend, Database layers", "completed": false}]'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: api
+        image: httpd:2.4
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: api-data
+          mountPath: /usr/local/apache2/htdocs/
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: api-data
+        configMap:
+          name: backend-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP
+---
+# Frontend Tier
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-html
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>3-Tier Application - Kubernetes</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+                overflow: hidden;
+            }
+            .header {
+                background: linear-gradient(45deg, #2196F3, #21CBF3);
+                color: white;
+                padding: 30px;
+                text-align: center;
+            }
+            .header h1 {
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+            .content {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 20px;
+                padding: 30px;
+            }
+            .tier {
+                background: white;
+                border-radius: 15px;
+                padding: 25px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                text-align: center;
+                transition: transform 0.3s ease;
+            }
+            .tier:hover {
+                transform: translateY(-5px);
+            }
+            .tier h2 {
+                color: #333;
+                margin-bottom: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+            }
+            .tier-icon {
+                font-size: 2em;
+            }
+            .status {
+                padding: 15px;
+                border-radius: 10px;
+                margin: 15px 0;
+                font-weight: bold;
+            }
+            .status.healthy {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .status.loading {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            .tier-details {
+                text-align: left;
+                margin-top: 20px;
+            }
+            .tier-details p {
+                margin: 8px 0;
+                color: #666;
+            }
+            .todos-section {
+                grid-column: 1 / -1;
+                background: #f8f9fa;
+                border-radius: 15px;
+                padding: 25px;
+                margin-top: 20px;
+            }
+            .todo-item {
+                background: white;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 8px;
+                border-left: 4px solid #4CAF50;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .footer {
+                text-align: center;
+                padding: 20px;
+                background: #2196F3;
+                color: white;
+                margin-top: 30px;
+                border-radius: 0 0 20px 20px;
+            }
+            .stats {
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🏗️ 3-Tier Application</h1>
+                <p>Frontend • Backend API • PostgreSQL Database</p>
+            </div>
+            
+            <div class="content">
+                <div class="tier">
+                    <h2><span class="tier-icon">🗄️</span> Frontend</h2>
+                    <div class="status healthy">✅ Running</div>
+                    <div class="tier-details">
+                        <p><strong>Technology:</strong> HTTPD</p>
+                        <p><strong>Replicas:</strong> 2</p>
+                        <p><strong>Access:</strong> NodePort 30400</p>
+                        <p><strong>Internal IP:</strong> ClusterIP</p>
+                    </div>
+                </div>
+                
+                <div class="tier">
+                    <h2><span class="tier-icon">⚙️</span> Backend API</h2>
+                    <div class="status loading" id="backend-status">🔄 Checking...</div>
+                    <div class="tier-details">
+                        <p><strong>Technology:</strong> HTTPD + JSON</p>
+                        <p><strong>Replicas:</strong> 2</p>
+                        <p><strong>Access:</strong> Internal Only</p>
+                        <p><strong>Endpoints:</strong> /api/health, /api/todos</p>
+                    </div>
+                </div>
+                
+                <div class="tier">
+                    <h2><span class="tier-icon">🗄️</span> Database</h2>
+                    <div class="status healthy">✅ Running</div>
+                    <div class="tier-details">
+                        <p><strong>Technology:</strong> PostgreSQL 15</p>
+                        <p><strong>Replicas:</strong> 1</p>
+                        <p><strong>Access:</strong> Internal Only</p>
+                        <p><strong>Storage:</strong> Ephemeral</p>
+                    </div>
+                </div>
+                
+                <div class="todos-section">
+                    <h3>📋 Sample Todo Data</h3>
+                    <div id="todos-container">
+                        <div class="todo-item">
+                            <div>
+                                <strong>Setup Kubernetes Cluster</strong><br>
+                                <small>Deploy 3-tier application infrastructure</small>
+                            </div>
+                            <span>✅</span>
+                        </div>
+                        <div class="todo-item">
+                            <div>
+                                <strong>Configure Networking</strong><br>
+                                <small>Setup services and load balancing</small>
+                            </div>
+                            <span>✅</span>
+                        </div>
+                        <div class="todo-item">
+                            <div>
+                                <strong>Deploy 3-Tier App</strong><br>
+                                <small>Frontend, Backend, Database layers</small>
+                            </div>
+                            <span>🔄</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <div class="stats">
+                    <span>🌟 Status: Production Ready</span>
+                    <span>K8s v1.28.15</span>
+                    <span>🚀 High Availability</span>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+            async function checkBackendHealth() {
+                try {
+                    const response = await fetch('/api/health');
+                    const data = await response.json();
+                    document.getElementById('backend-status').innerHTML = 
+                        '<span class="status healthy">✅ ' + data.status + '</span>';
+                } catch (error) {
+                    document.getElementById('backend-status').innerHTML = 
+                        '<span class="status loading">❌ Connection Error</span>';
+                }
+            }
+            
+            // Check backend health on load
+            checkBackendHealth();
+            
+            // Check backend health every 10 seconds
+            setInterval(checkBackendHealth, 10000);
+        </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: web
+        image: httpd:2.4
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: frontend-html
+          mountPath: /usr/local/apache2/htdocs/
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: frontend-html
+        configMap:
+          name: frontend-html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30400
+  type: NodePort

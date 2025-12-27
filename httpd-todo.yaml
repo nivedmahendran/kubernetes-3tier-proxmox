@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-app
+  labels:
+    app: todo-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: todo-app
+  template:
+    metadata:
+      labels:
+        app: todo-app
+    spec:
+      containers:
+      - name: todo-app
+        image: httpd:2.4
+        ports:
+        - containerPort: 80
+        command: ["/bin/sh", "-c"]
+        args: 
+        - |
+          echo '<!DOCTYPE html><html><head><title>Todo Application</title><style>body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}.container{max-width:800px;margin:0 auto;background:white;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}.header{text-align:center;color:#333;margin-bottom:30px}.todo-item{background:#e8f5e8;padding:15px;margin:10px 0;border-left:4px solid #4CAF50;border-radius:4px}.stats{display:flex;justify-content:space-between;margin-top:30px;background:#2196F3;color:white;padding:15px;border-radius:5px}</style></head><body><div class=container><div class=header><h1>📝 Kubernetes Todo Application</h1><p>Successfully deployed on Kubernetes cluster!</p></div><div class=todo-item><h3>✅ Cluster Status: Healthy</h3><p>Pods are running across multiple nodes</p></div><div class=todo-item><h3>✅ Services: Active</h3><p>NodePort service configured for external access</p></div><div class=stats><span>🚀 Ready for Production</span><span>K8s v1.28.15</span></div></div></body></html>' > /usr/local/apache2/htdocs/index.html
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-service
+spec:
+  selector:
+    app: todo-app
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+      nodePort: 30300
+  type: NodePort

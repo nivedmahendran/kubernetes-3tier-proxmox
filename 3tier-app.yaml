@@ -1,0 +1,491 @@
+---
+# Database Tier - PostgreSQL
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database
+  labels:
+    app: database
+    tier: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+        tier: backend
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: "appdb"
+        - name: POSTGRES_USER
+          value: "appuser"
+        - name: POSTGRES_PASSWORD
+          value: "apppass"
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+      volumes:
+      - name: postgres-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database-service
+  labels:
+    app: database
+    tier: backend
+spec:
+  selector:
+    app: database
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP
+---
+# Backend API Tier - Node.js
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-api
+  labels:
+    app: backend-api
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend-api
+  template:
+    metadata:
+      labels:
+        app: backend-api
+        tier: backend
+    spec:
+      containers:
+      - name: api
+        image: node:18-alpine
+        command: ["/bin/sh"]
+        args: ["-c"]
+        - |
+          cat > /app/server.js << 'EOF'
+          const express = require('express');
+          const { Pool } = require('pg');
+          const app = express();
+          const port = 3000;
+          
+          const pool = new Pool({
+            user: 'appuser',
+            host: 'database-service',
+            database: 'appdb',
+            password: 'apppass',
+            port: 5432,
+          });
+          
+          app.use(express.json());
+          
+          app.get('/api/health', (req, res) => {
+            res.json({ status: 'healthy', tier: 'backend', timestamp: new Date().toISOString() });
+          });
+          
+          app.get('/api/todos', async (req, res) => {
+            try {
+              const result = await pool.query('SELECT * FROM todos ORDER BY id DESC LIMIT 10');
+              res.json({ success: true, data: result.rows, count: result.rowCount });
+            } catch (err) {
+              res.status(500).json({ success: false, error: err.message });
+            }
+          });
+          
+          app.post('/api/todos', async (req, res) => {
+            try {
+              const { title, description } = req.body;
+              const result = await pool.query(
+                'INSERT INTO todos (title, description, created_at) VALUES ($1, $2, NOW()) RETURNING *',
+                [title, description]
+              );
+              res.json({ success: true, data: result.rows[0] });
+            } catch (err) {
+              res.status(500).json({ success: false, error: err.message });
+            }
+          });
+          
+          app.listen(port, () => {
+            console.log(\`Backend API running on port \${port}\`);
+          });
+          EOF
+          
+          cat > /app/package.json << 'EOF'
+          {
+            "name": "3tier-backend",
+            "version": "1.0.0",
+            "dependencies": {
+              "express": "^4.18.0",
+              "pg": "^8.8.0"
+            }
+          }
+          EOF
+          
+          npm install && node server.js
+        ports:
+        - containerPort: 3000
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://appuser:apppass@database-service:5432/appdb"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  labels:
+    app: backend-api
+    tier: backend
+spec:
+  selector:
+    app: backend-api
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP
+---
+# Frontend Tier - React App
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: frontend
+    spec:
+      containers:
+      - name: web
+        image: httpd:2.4
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: frontend-html
+          mountPath: /usr/local/apache2/htdocs/
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+      volumes:
+      - name: frontend-html
+        configMap:
+          name: frontend-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>3-Tier Application - Kubernetes</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+                overflow: hidden;
+            }
+            .header {
+                background: linear-gradient(45deg, #2196F3, #21CBF3);
+                color: white;
+                padding: 30px;
+                text-align: center;
+            }
+            .header h1 {
+                font-size: 2.5em;
+                margin-bottom: 10px;
+            }
+            .content {
+                display: grid;
+                grid-template-columns: 1fr 2fr;
+                gap: 30px;
+                padding: 30px;
+            }
+            .tier {
+                background: white;
+                border-radius: 15px;
+                padding: 25px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            }
+            .tier h2 {
+                color: #333;
+                margin-bottom: 20px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+            .tier-icon {
+                font-size: 1.5em;
+            }
+            .status {
+                padding: 15px;
+                border-radius: 10px;
+                margin: 15px 0;
+                font-weight: bold;
+            }
+            .status.healthy {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .status.loading {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            .todo-form {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 10px;
+                margin-top: 20px;
+            }
+            .form-group {
+                margin-bottom: 15px;
+            }
+            .form-group label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+                color: #555;
+            }
+            .form-group input, .form-group textarea {
+                width: 100%;
+                padding: 12px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+            .btn {
+                background: #4CAF50;
+                color: white;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            .btn:hover {
+                background: #45a049;
+            }
+            .todos-list {
+                margin-top: 20px;
+            }
+            .todo-item {
+                background: #f9f9f9;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 8px;
+                border-left: 4px solid #4CAF50;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .footer {
+                text-align: center;
+                padding: 20px;
+                background: #2196F3;
+                color: white;
+                margin-top: 30px;
+                border-radius: 0 0 20px 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🏗️ 3-Tier Application</h1>
+                <p>Frontend • Backend API • PostgreSQL Database</p>
+            </div>
+            
+            <div class="content">
+                <div class="tier">
+                    <h2><span class="tier-icon">🗄️</span> Frontend</h2>
+                    <div class="status healthy">✅ Running</div>
+                    <p>React-like web interface</p>
+                    <p>NodePort: 30400</p>
+                </div>
+                
+                <div class="tier">
+                    <h2><span class="tier-icon">⚙️</span> Backend API</h2>
+                    <div class="status loading">🔄 Loading...</div>
+                    <p>Node.js REST API</p>
+                    <p>Internal service only</p>
+                </div>
+                
+                <div class="tier">
+                    <h2><span class="tier-icon">🗄️</span> Database</h2>
+                    <div class="status loading">🔄 Loading...</div>
+                    <p>PostgreSQL 15</p>
+                    <p>Persistent storage</p>
+                </div>
+            </div>
+            
+            <div class="todo-form">
+                <h3>📝 Add New Todo</h3>
+                <div class="form-group">
+                    <label for="title">Title:</label>
+                    <input type="text" id="title" placeholder="Enter todo title...">
+                </div>
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" rows="3" placeholder="Enter description..."></textarea>
+                </div>
+                <button class="btn" onclick="addTodo()">Add Todo</button>
+                <div id="message"></div>
+            </div>
+            
+            <div class="todos-list" id="todos-list">
+                <!-- Todos will be loaded here -->
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>🚀 Kubernetes 3-Tier Architecture</p>
+            <p>High Availability • Scalable • Production Ready</p>
+        </div>
+        
+        <script>
+            async function checkHealth() {
+                try {
+                    const response = await fetch('/api/health');
+                    const data = await response.json();
+                    document.querySelector('.backend .status').innerHTML = 
+                        '<span class="status healthy">✅ ' + data.status + '</span>';
+                    document.querySelector('.backend .status').innerHTML += 
+                        '<br><small>' + data.timestamp + '</small>';
+                } catch (error) {
+                    document.querySelector('.backend .status').innerHTML = 
+                        '<span class="status loading">❌ Connection Error</span>';
+                }
+            }
+            
+            async function loadTodos() {
+                try {
+                    const response = await fetch('/api/todos');
+                    const data = await response.json();
+                    const todosList = document.getElementById('todos-list');
+                    
+                    if (data.success && data.data) {
+                        todosList.innerHTML = '<h3>📋 Recent Todos</h3>' + 
+                            data.data.map(todo => 
+                                '<div class="todo-item">' +
+                                '<strong>' + todo.title + '</strong><br>' +
+                                '<small>' + todo.description + '</small>' +
+                                '</div>'
+                            ).join('');
+                    }
+                } catch (error) {
+                    document.getElementById('todos-list').innerHTML = 
+                        '<div class="status loading">❌ Failed to load todos</div>';
+                }
+            }
+            
+            async function addTodo() {
+                const title = document.getElementById('title').value;
+                const description = document.getElementById('description').value;
+                const message = document.getElementById('message');
+                
+                if (!title.trim()) {
+                    message.innerHTML = '<div class="status loading">⚠️ Please enter a title</div>';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/todos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title, description })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        message.innerHTML = '<div class="status healthy">✅ Todo added successfully!</div>';
+                        document.getElementById('title').value = '';
+                        document.getElementById('description').value = '';
+                        loadTodos(); // Reload todos
+                    } else {
+                        message.innerHTML = '<div class="status loading">❌ Failed to add todo</div>';
+                    }
+                } catch (error) {
+                    message.innerHTML = '<div class="status loading">❌ Network error</div>';
+                }
+            }
+            
+            // Initialize
+            checkHealth();
+            loadTodos();
+            setInterval(checkHealth, 10000); // Check health every 10 seconds
+        </script>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  labels:
+    app: frontend
+    tier: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30400
+  type: NodePort

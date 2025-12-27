@@ -1,0 +1,30 @@
+---
+- name: Install QEMU Agent on all VMs
+  hosts: all
+  become: yes
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install QEMU guest agent
+      apt:
+        name: qemu-guest-agent
+        state: present
+
+    - name: Enable and start QEMU agent service
+      systemd:
+        name: qemu-guest-agent
+        state: started
+        enabled: yes
+
+    - name: Verify QEMU agent is running
+      systemd:
+        name: qemu-guest-agent
+      register: service_status
+
+    - name: Display QEMU agent status
+      debug:
+        msg: "QEMU agent is {{ 'running' if service_status.status.ActiveState == 'active' else 'not running' }}"
