@@ -1,9 +1,0 @@
-# Proxmox Configuration
-proxmox_ssh_password = "your-proxmox-ssh-password"
-
-# Number of worker nodes to create
-vm_count = 2
-
-# SSH Public Key (replace with your actual key)
-# Generate with: ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
-# ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDqYTxwkRFKBOIFLxOMarmwNZUw901hLLwab+0ghIY+7oxkEQ..."
