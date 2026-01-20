@@ -1,4 +1,4 @@
-# Kubernetes 3-Tier Todo Application on Proxmox
+# Kubernetes Setup using Ansible and Terraform in Proxmox
 
 ## 🚀 Quick Start
 
@@ -16,19 +16,9 @@ ansible-playbook -i inventory.ini playbook.yml
 ansible-playbook -i inventory.ini join-workers.yml
 ```
 
-### 3. Deploy Todo Application
+### 3. Verify Cluster
 ```bash
-cd todo-app
-./deploy-all.sh
-```
-
-### 4. Access the Application
-```bash
-# Get the NodePort
-kubectl get service todo-frontend-service -n todo-app
-
-# Access via browser
-http://<any-node-ip>:<nodeport>
+ssh -i ~/proxmox ubuntu@<control-node-ip> "kubectl get nodes"
 ```
 
 ## 📁 Project Structure
@@ -44,19 +34,6 @@ http://<any-node-ip>:<nodeport>
 │   ├── outputs.tf            # Output variables
 │   ├── variable.tf           # Input variables
 │   └── terraform.tfvars      # Variable values
-├── todo-app/          # Todo application manifests
-│   ├── namespace.yaml         # Application namespace
-│   ├── postgres-secret.yaml  # Database credentials
-│   ├── postgres-pvc.yaml     # Persistent storage
-│   ├── postgres-deployment.yaml # Database deployment
-│   ├── postgres-service.yaml # Database service
-│   ├── backend-configmap.yaml # Backend application code
-│   ├── backend-deployment.yaml # Backend deployment
-│   ├── backend-service.yaml  # Backend service
-│   ├── frontend-configmap.yaml # Frontend code and nginx config
-│   ├── frontend-deployment.yaml # Frontend deployment
-│   ├── frontend-service.yaml # Frontend NodePort service
-│   └── deploy-all.sh         # Automated deployment script
 └── README.md          # This file
 ```
 
@@ -74,13 +51,14 @@ http://<any-node-ip>:<nodeport>
 - Worker 1: 10.10.8.24  
 - Worker 2: 10.10.8.23
 
-## 🎯 Todo Application Features
-- **3-Tier Architecture:** Frontend (Nginx) → Backend (Python Flask) → Database (PostgreSQL)
-- **Complete CRUD Operations:** Create, Read, Delete todos
-- **Persistent Storage:** PostgreSQL with PVC
-- **High Availability:** 2 replicas each for frontend and backend
-- **Load Balancing:** Kubernetes services
-- **External Access:** NodePort service for frontend
+## 🎯 Kubernetes Cluster Features
+- **Infrastructure as Code:** Terraform for Proxmox VM provisioning
+- **Configuration Management:** Ansible for Kubernetes setup
+- **High Availability:** Multi-node Kubernetes cluster
+- **Container Runtime:** containerd
+- **CNI:** Calico networking
+- **Kubernetes Version:** 1.28.4
+- **VM OS:** Ubuntu 22.04
 
 ## 🐛 Troubleshooting & Error Resolution
 
@@ -187,17 +165,13 @@ async function deleteTodo(todoId) {
 - **CNI:** Calico
 - **Kubernetes Version:** 1.28.4
 - **VM OS:** Ubuntu 22.04
-- **Database:** PostgreSQL with persistent storage
-- **Backend:** Python Flask with psycopg2
-- **Frontend:** Nginx serving static HTML/JS
-- **Storage:** local-path provisioner for PVCs
-- **Load Balancing:** Kubernetes services with NodePort
+- **Infrastructure:** Proxmox VMs
+- **Configuration:** Terraform + Ansible
 
 ## 🎉 Success Criteria Met
-✅ 3-tier Kubernetes cluster deployed
-✅ Todo application with complete CRUD functionality
-✅ Persistent database storage
-✅ High availability with multiple replicas
-✅ External access via NodePort
-✅ Clean, maintainable configuration
+✅ Kubernetes cluster deployed on Proxmox
+✅ Infrastructure as Code with Terraform
+✅ Configuration Management with Ansible
+✅ Multi-node high availability setup
+✅ Container runtime and networking configured
 ✅ All errors resolved and documented
