@@ -109,4 +109,4 @@
 
     - name: Join worker to Kubernetes cluster
       shell: |
-        kubeadm join 10.10.10.161:6443 --token yt7sx1.9bhqtxanej32rxy4 --discovery-token-ca-cert-hash sha256:6224d379178921381f06c5294872f74a7159b2b5a697dad37e0d064616391935
+        kubeadm join 10.10.8.25:6443 --token 8tnkah.sg65j8m3ho94tzpq --discovery-token-ca-cert-hash sha256:032b5ab891e5193a39e73beeeed5cc88cf6cb29b7df30b1bcdf5243c5d86c9a3

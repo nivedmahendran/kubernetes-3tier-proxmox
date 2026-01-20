@@ -21,6 +21,6 @@ provider "proxmox" {
   ssh {
     agent    = false
     username = "root"
-    private_key = file("~/proxmox")
+    private_key = file("/home/nived/.ssh/proxmox")
   }
 }

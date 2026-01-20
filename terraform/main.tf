@@ -11,7 +11,7 @@ resource "proxmox_virtual_environment_vm" "k8s_control" {
   description = "Managed by Terraform"
   tags        = ["terraform", "ubuntu", "k8s", "control"]
   node_name   = var.proxmox_host
-  vm_id       = 100
+  vm_id       = 200
 
   # CPU configuration
   cpu {
@@ -87,7 +87,7 @@ resource "proxmox_virtual_environment_vm" "k8s_nodes" {
   description = "Managed by Terraform"
   tags        = ["terraform", "ubuntu", "k8s", "worker"]
   node_name   = var.proxmox_host
-  vm_id       = 100 + count.index + 1
+  vm_id       = 200 + count.index + 1
 
   # CPU configuration
   cpu {
